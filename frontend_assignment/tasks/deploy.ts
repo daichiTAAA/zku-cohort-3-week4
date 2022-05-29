@@ -1,32 +1,49 @@
-import { IncrementalMerkleTree } from "@zk-kit/incremental-merkle-tree"
-import { poseidon } from "circomlibjs"
-import { Contract } from "ethers"
-import { task, types } from "hardhat/config"
-import identityCommitments from "../public/identityCommitments.json"
+import { IncrementalMerkleTree } from '@zk-kit/incremental-merkle-tree';
+import { poseidon } from 'circomlibjs';
+import { Contract } from 'ethers';
+import { task, types } from 'hardhat/config';
+import identityCommitments from '../public/identityCommitments.json';
+import * as fs from 'fs';
 
-task("deploy", "Deploy a Greeters contract")
-    .addOptionalParam<boolean>("logs", "Print the logs", true, types.boolean)
-    .setAction(async ({ logs }, { ethers }): Promise<Contract> => {
-        const VerifierContract = await ethers.getContractFactory("Verifier")
-        const verifier = await VerifierContract.deploy()
+task('deploy', 'Deploy a Greeters contract')
+  .addOptionalParam<boolean>('logs', 'Print the logs', true, types.boolean)
+  .setAction(async ({ logs }, { ethers }): Promise<Contract> => {
+    const VerifierContract = await ethers.getContractFactory('Verifier');
+    const verifier = await VerifierContract.deploy();
 
-        await verifier.deployed()
+    await verifier.deployed();
 
-        logs && console.log(`Verifier contract has been deployed to: ${verifier.address}`)
+    logs &&
+      console.log(
+        `Verifier contract has been deployed to: ${verifier.address}`
+      );
 
-        const GreetersContract = await ethers.getContractFactory("Greeters")
+    const GreetersContract = await ethers.getContractFactory('Greeters');
 
-        const tree = new IncrementalMerkleTree(poseidon, 20, BigInt(0), 2)
+    const tree = new IncrementalMerkleTree(poseidon, 20, BigInt(0), 2);
 
-        for (const identityCommitment of identityCommitments) {
-            tree.insert(identityCommitment)
-        }
+    for (const identityCommitment of identityCommitments) {
+      tree.insert(identityCommitment);
+    }
 
-        const greeters = await GreetersContract.deploy(tree.root, verifier.address)
+    const greeters = await GreetersContract.deploy(tree.root, verifier.address);
 
-        await greeters.deployed()
+    console.log('tree.root is: ', tree.root);
+    console.log('verifier.address is: ', verifier.address);
 
-        logs && console.log(`Greeters contract has been deployed to: ${greeters.address}`)
+    await greeters.deployed();
 
-        return greeters
-    })
+    logs &&
+      console.log(
+        `Greeters contract has been deployed to: ${greeters.address}`
+      );
+
+    let config = `
+      export const verifierAddress = '${verifier.address}'
+      export const greetersAddress = '${greeters.address}'`;
+
+    let data = JSON.stringify(config);
+    fs.writeFileSync('config.ts', JSON.parse(data));
+
+    return greeters;
+  });
